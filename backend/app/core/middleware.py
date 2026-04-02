@@ -361,3 +361,151 @@ __all__ = [
     "ErrorHandlingMiddleware",
     "CORSMiddleware",
 ]
+
+
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    """
+    Middleware for rate limiting API requests.
+    
+    This middleware implements a simple in-memory rate limiter to prevent
+    abuse and ensure fair resource usage. It tracks requests per IP address
+    and enforces configurable rate limits.
+    
+    Features:
+    - Per-IP rate limiting
+    - Configurable time window and request limit
+    - Automatic cleanup of expired entries
+    - Rate limit headers in responses
+    
+    Rate Limit Headers:
+    - X-RateLimit-Limit: Maximum requests allowed in time window
+    - X-RateLimit-Remaining: Requests remaining in current window
+    - X-RateLimit-Reset: Timestamp when the rate limit resets
+    
+    Configuration:
+        rate_limit_requests: Maximum requests per time window (default: 100)
+        rate_limit_window: Time window in seconds (default: 60)
+    
+    Example:
+        app.add_middleware(
+            RateLimitMiddleware,
+            rate_limit_requests=100,
+            rate_limit_window=60
+        )
+    
+    Note:
+        This is an in-memory implementation suitable for single-server
+        deployments. For multi-server deployments, use Redis-based
+        rate limiting (e.g., slowapi or fastapi-limiter).
+    """
+    
+    def __init__(
+        self,
+        app: ASGIApp,
+        rate_limit_requests: int = 100,
+        rate_limit_window: int = 60
+    ):
+        """
+        Initialize rate limiter with configuration.
+        
+        Args:
+            app: ASGI application
+            rate_limit_requests: Maximum requests per window
+            rate_limit_window: Time window in seconds
+        """
+        super().__init__(app)
+        self.rate_limit_requests = rate_limit_requests
+        self.rate_limit_window = rate_limit_window
+        self.request_counts: Dict[str, list] = {}
+    
+    def _cleanup_old_requests(self, ip: str, current_time: float):
+        """Remove requests outside the time window."""
+        if ip in self.request_counts:
+            cutoff_time = current_time - self.rate_limit_window
+            self.request_counts[ip] = [
+                req_time for req_time in self.request_counts[ip]
+                if req_time > cutoff_time
+            ]
+    
+    async def dispatch(
+        self,
+        request: Request,
+        call_next: Callable
+    ) -> Response:
+        """
+        Process the request with rate limiting.
+        
+        Args:
+            request: Incoming HTTP request
+            call_next: Function to call the next middleware or endpoint
+            
+        Returns:
+            Response: HTTP response or 429 Too Many Requests if rate limit exceeded
+        """
+        # Get client IP
+        client_ip = request.client.host if request.client else "unknown"
+        current_time = time.time()
+        
+        # Skip rate limiting for health check endpoints
+        if request.url.path in ["/health", "/ping"]:
+            return await call_next(request)
+        
+        # Initialize request list for this IP if not exists
+        if client_ip not in self.request_counts:
+            self.request_counts[client_ip] = []
+        
+        # Clean up old requests
+        self._cleanup_old_requests(client_ip, current_time)
+        
+        # Check rate limit
+        request_count = len(self.request_counts[client_ip])
+        
+        if request_count >= self.rate_limit_requests:
+            # Rate limit exceeded
+            reset_time = int(self.request_counts[client_ip][0] + self.rate_limit_window)
+            
+            logger.warning(
+                f"Rate limit exceeded for {client_ip}: "
+                f"{request_count} requests in {self.rate_limit_window}s window"
+            )
+            
+            return JSONResponse(
+                status_code=429,
+                content={
+                    "detail": "Too many requests. Please try again later.",
+                    "retry_after": reset_time - int(current_time)
+                },
+                headers={
+                    "X-RateLimit-Limit": str(self.rate_limit_requests),
+                    "X-RateLimit-Remaining": "0",
+                    "X-RateLimit-Reset": str(reset_time),
+                    "Retry-After": str(reset_time - int(current_time))
+                }
+            )
+        
+        # Add current request to tracking
+        self.request_counts[client_ip].append(current_time)
+        
+        # Process the request
+        response = await call_next(request)
+        
+        # Add rate limit headers to response
+        remaining = self.rate_limit_requests - len(self.request_counts[client_ip])
+        reset_time = int(current_time + self.rate_limit_window)
+        
+        response.headers["X-RateLimit-Limit"] = str(self.rate_limit_requests)
+        response.headers["X-RateLimit-Remaining"] = str(remaining)
+        response.headers["X-RateLimit-Reset"] = str(reset_time)
+        
+        return response
+
+
+# Update exports
+__all__ = [
+    "LoggingMiddleware",
+    "SecurityHeadersMiddleware",
+    "RequestIDMiddleware",
+    "ErrorHandlingMiddleware",
+    "CORSMiddleware",
+    "RateLimitMiddleware",
+]

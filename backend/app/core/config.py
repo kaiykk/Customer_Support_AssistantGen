@@ -303,6 +303,26 @@ class Settings(BaseSettings):
         description="Comma-separated list of allowed CORS origins"
     )
     
+    # HTTP Client Configuration
+    HTTP_TIMEOUT: int = Field(
+        default=30,
+        ge=1,
+        le=300,
+        description="HTTP request timeout in seconds for external API calls"
+    )
+    HTTP_CONNECT_TIMEOUT: int = Field(
+        default=10,
+        ge=1,
+        le=60,
+        description="HTTP connection timeout in seconds"
+    )
+    HTTP_MAX_RETRIES: int = Field(
+        default=3,
+        ge=0,
+        le=10,
+        description="Maximum number of retries for failed HTTP requests"
+    )
+    
     # ========================================================================
     # Computed Properties
     # ========================================================================

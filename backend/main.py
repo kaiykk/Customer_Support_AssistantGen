@@ -35,7 +35,13 @@ from app.api import api_router
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 from app.core.logger import get_logger, log_structured
-from app.core.middleware import LoggingMiddleware
+from app.core.middleware import (
+    LoggingMiddleware,
+    SecurityHeadersMiddleware,
+    RequestIDMiddleware,
+    ErrorHandlingMiddleware,
+    RateLimitMiddleware
+)
 from app.lg_agent.lg_builder import graph
 from app.lg_agent.lg_states import AgentState, InputState
 from app.lg_agent.utils import new_uuid
@@ -61,8 +67,16 @@ app = FastAPI(
     redoc_url="/api/redoc",
 )
 
-# Add logging middleware to replace FastAPI's default logging
+# Add middleware in reverse order (last added = first executed)
 app.add_middleware(LoggingMiddleware)
+app.add_middleware(RequestIDMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(ErrorHandlingMiddleware)
+app.add_middleware(
+    RateLimitMiddleware,
+    rate_limit_requests=100,  # 100 requests
+    rate_limit_window=60      # per 60 seconds
+)
 
 # Configure CORS (Cross-Origin Resource Sharing)
 # In production, replace "*" with specific allowed origins

@@ -264,72 +264,98 @@ class ConversationService:
     @staticmethod
     async def get_user_conversations(
         user_id: int,
-        include_empty: bool = False
-    ) -> List[Dict]:
+        include_empty: bool = False,
+        skip: int = 0,
+        limit: int = 50
+    ) -> Dict[str, any]:
         """
-        Retrieve all conversations for a user.
+        Retrieve conversations for a user with pagination support.
         
         Args:
             user_id: ID of the user
             include_empty: Whether to include conversations with no messages
                           (default: False, excludes "New Conversation" entries)
+            skip: Number of conversations to skip (for pagination)
+            limit: Maximum number of conversations to return (default: 50)
             
         Returns:
-            List[Dict]: List of conversation dictionaries with metadata
+            Dict: Dictionary containing conversations list and pagination metadata
             
         Raises:
             Exception: If database operation fails
             
         Example:
-            conversations = await ConversationService.get_user_conversations(
-                user_id=123
+            result = await ConversationService.get_user_conversations(
+                user_id=123,
+                skip=0,
+                limit=20
             )
-            for conv in conversations:
-                print(f"{conv['id']}: {conv['title']}")
+            print(f"Total: {result['total']}, Page: {result['conversations']}")
                 
         Response Format:
-            [
-                {
-                    "id": 1,
-                    "title": "Python Help",
-                    "created_at": "2024-01-01T12:00:00",
-                    "status": "active",
-                    "dialogue_type": "normal"
-                },
-                ...
-            ]
+            {
+                "conversations": [
+                    {
+                        "id": 1,
+                        "title": "Python Help",
+                        "created_at": "2024-01-01T12:00:00",
+                        "status": "active",
+                        "dialogue_type": "normal"
+                    },
+                    ...
+                ],
+                "total": 100,
+                "skip": 0,
+                "limit": 20
+            }
         """
         try:
             async with AsyncSessionLocal() as db:
-                # Build query
-                stmt = select(Conversation).where(
+                # Build base query
+                base_stmt = select(Conversation).where(
                     Conversation.user_id == user_id
                 )
                 
                 # Exclude empty conversations unless requested
                 if not include_empty:
-                    stmt = stmt.where(Conversation.title != "New Conversation")
+                    base_stmt = base_stmt.where(Conversation.title != "New Conversation")
                 
-                # Order by most recent first
-                stmt = stmt.order_by(Conversation.created_at.desc())
+                # Get total count
+                from sqlalchemy import func
+                count_stmt = select(func.count()).select_from(
+                    base_stmt.subquery()
+                )
+                total_result = await db.execute(count_stmt)
+                total = total_result.scalar() or 0
+                
+                # Build paginated query
+                stmt = base_stmt.order_by(
+                    Conversation.created_at.desc()
+                ).offset(skip).limit(limit)
                 
                 result = await db.execute(stmt)
                 conversations = result.scalars().all()
                 
                 logger.info(
-                    f"Retrieved {len(conversations)} conversations for user {user_id}"
+                    f"Retrieved {len(conversations)} conversations for user {user_id} "
+                    f"(skip={skip}, limit={limit}, total={total})"
                 )
                 
-                return [
-                    {
-                        "id": conv.id,
-                        "title": conv.title,
-                        "created_at": conv.created_at.isoformat(),
-                        "status": conv.status,
-                        "dialogue_type": conv.dialogue_type.value
-                    }
-                    for conv in conversations
-                ]
+                return {
+                    "conversations": [
+                        {
+                            "id": conv.id,
+                            "title": conv.title,
+                            "created_at": conv.created_at.isoformat(),
+                            "status": conv.status,
+                            "dialogue_type": conv.dialogue_type.value
+                        }
+                        for conv in conversations
+                    ],
+                    "total": total,
+                    "skip": skip,
+                    "limit": limit
+                }
                 
         except Exception as e:
             logger.error(
@@ -341,10 +367,12 @@ class ConversationService:
     @staticmethod
     async def get_conversation_messages(
         conversation_id: int,
-        user_id: int
-    ) -> List[Dict]:
+        user_id: int,
+        skip: int = 0,
+        limit: int = 100
+    ) -> Dict[str, any]:
         """
-        Retrieve all messages from a conversation.
+        Retrieve messages from a conversation with pagination support.
         
         This method verifies that the conversation belongs to the user
         before returning messages.
@@ -352,40 +380,42 @@ class ConversationService:
         Args:
             conversation_id: ID of the conversation
             user_id: ID of the user (for ownership verification)
+            skip: Number of messages to skip (for pagination)
+            limit: Maximum number of messages to return (default: 100)
             
         Returns:
-            List[Dict]: List of message dictionaries in chronological order
+            Dict: Dictionary containing messages list and pagination metadata
             
         Raises:
             ValueError: If conversation not found or not owned by user
             Exception: If database operation fails
             
         Example:
-            messages = await ConversationService.get_conversation_messages(
+            result = await ConversationService.get_conversation_messages(
                 conversation_id=456,
-                user_id=123
+                user_id=123,
+                skip=0,
+                limit=50
             )
-            for msg in messages:
+            for msg in result['messages']:
                 print(f"{msg['sender']}: {msg['content']}")
                 
         Response Format:
-            [
-                {
-                    "id": 1,
-                    "sender": "user",
-                    "content": "What is Python?",
-                    "created_at": "2024-01-01T12:00:00",
-                    "message_type": "text"
-                },
-                {
-                    "id": 2,
-                    "sender": "assistant",
-                    "content": "Python is...",
-                    "created_at": "2024-01-01T12:00:05",
-                    "message_type": "text"
-                },
-                ...
-            ]
+            {
+                "messages": [
+                    {
+                        "id": 1,
+                        "sender": "user",
+                        "content": "What is Python?",
+                        "created_at": "2024-01-01T12:00:00",
+                        "message_type": "text"
+                    },
+                    ...
+                ],
+                "total": 150,
+                "skip": 0,
+                "limit": 50
+            }
         """
         try:
             async with AsyncSessionLocal() as db:
@@ -407,29 +437,42 @@ class ConversationService:
                         f"not owned by user {user_id}"
                     )
                 
-                # Query all messages in chronological order
+                # Get total count
+                from sqlalchemy import func
+                count_stmt = select(func.count()).where(
+                    Message.conversation_id == conversation_id
+                )
+                total_result = await db.execute(count_stmt)
+                total = total_result.scalar() or 0
+                
+                # Query messages with pagination
                 stmt = select(Message).where(
                     Message.conversation_id == conversation_id
-                ).order_by(Message.created_at)
+                ).order_by(Message.created_at).offset(skip).limit(limit)
                 
                 result = await db.execute(stmt)
                 messages = result.scalars().all()
                 
                 logger.info(
                     f"Retrieved {len(messages)} messages from "
-                    f"conversation {conversation_id}"
+                    f"conversation {conversation_id} (skip={skip}, limit={limit}, total={total})"
                 )
                 
-                return [
-                    {
-                        "id": msg.id,
-                        "sender": msg.sender,
-                        "content": msg.content,
-                        "created_at": msg.created_at.isoformat(),
-                        "message_type": msg.message_type
-                    }
-                    for msg in messages
-                ]
+                return {
+                    "messages": [
+                        {
+                            "id": msg.id,
+                            "sender": msg.sender,
+                            "content": msg.content,
+                            "created_at": msg.created_at.isoformat(),
+                            "message_type": msg.message_type
+                        }
+                        for msg in messages
+                    ],
+                    "total": total,
+                    "skip": skip,
+                    "limit": limit
+                }
                 
         except Exception as e:
             logger.error(
