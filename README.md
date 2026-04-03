@@ -466,38 +466,10 @@ See detailed deployment guides:
 ### Common Issues
 
 #### Database Connection Error
-```
-Error: Can't connect to MySQL server
-```
-**Solution**: Verify MySQL is running and credentials in `.env` are correct.
-
 #### Port Already in Use
-```
-Error: Address already in use
-```
-**Solution**: Change port in `.env` or stop the process using the port.
-
 #### LLM API Error
-```
-Error: Invalid API key
-```
-**Solution**: Verify your DeepSeek API key in `.env` is correct.
-
 #### Frontend Can't Connect to Backend
-```
-Error: Network Error
-```
-**Solution**: Ensure backend is running and `VITE_API_BASE_URL` is correct.
-
 ### Debug Mode
-
-Enable debug mode for detailed error messages:
-
-```env
-DEBUG=true
-LOG_LEVEL=DEBUG
-```
-
 ### Getting Help
 
 - Check [Documentation](docs/)
@@ -508,29 +480,6 @@ LOG_LEVEL=DEBUG
 ## 🤝 Contributing
 
 We welcome contributions! Please follow these guidelines:
-
-### How to Contribute
-
-1. **Fork the repository**
-2. **Create a feature branch**: `git checkout -b feature/amazing-feature`
-3. **Make your changes**
-4. **Write tests** for new functionality
-5. **Update documentation**
-6. **Commit changes**: `git commit -m 'Add amazing feature'`
-7. **Push to branch**: `git push origin feature/amazing-feature`
-8. **Open a Pull Request**
-
-### Code Review Checklist
-
-- [ ] Code follows style guidelines
-- [ ] All tests pass
-- [ ] New tests added for new features
-- [ ] Documentation updated
-- [ ] No security vulnerabilities
-- [ ] Performance considerations addressed
-
-See [Code Review Checklist](docs/code-review-checklist.md) for complete list.
-
 ### Development Setup
 
 ```bash
@@ -544,10 +493,6 @@ pre-commit install
 pre-commit run --all-files
 ```
 
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
 ## 🙏 Acknowledgments
 
 - FastAPI for the excellent web framework
@@ -555,13 +500,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - DeepSeek for AI capabilities
 - Ollama for local LLM support
 - All contributors and supporters
-
-## 📞 Contact
-
-- **Project Maintainer**: [Your Name]
-- **Email**: [your.email@example.com]
-- **Website**: [https://your-website.com]
-- **Issues**: [GitHub Issues](https://github.com/your-repo/issues)
 
 ## 🗺️ Roadmap
 
@@ -585,4 +523,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Built with ❤️ by the AssistGen Team**
+**Built with ❤️ by Kai**
