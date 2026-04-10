@@ -9,6 +9,7 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
+import { useUserStore } from '@/stores/user'
 
 // Import global styles
 import './styles/main.scss'
@@ -23,8 +24,12 @@ const pinia = createPinia()
 app.use(pinia)
 app.use(router)
 
+// Initialize user store from localStorage
+const userStore = useUserStore()
+userStore.init()
+
 // Global error handler
-app.config.errorHandler = (err, instance, info) => {
+app.config.errorHandler = (err, _instance, info) => {
   console.error('Global error:', err)
   console.error('Error info:', info)
   // TODO: Send to error tracking service

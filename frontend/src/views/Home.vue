@@ -164,12 +164,10 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick, watch } from 'vue'
-import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useConversationStore } from '@/stores/conversation'
 import { DialogueType } from '@/types'
 
-const router = useRouter()
 const userStore = useUserStore()
 const conversationStore = useConversationStore()
 

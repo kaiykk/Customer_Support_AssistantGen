@@ -14,9 +14,9 @@ import type {
   Conversation,
   Message,
   ChatRequest,
-  ChatResponse,
-  DialogueType
+  ChatResponse
 } from '@/types'
+import { DialogueType } from '@/types'
 
 /**
  * API client instance with configured base URL and interceptors
