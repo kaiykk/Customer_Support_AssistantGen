@@ -9,6 +9,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { api } from '@/api'
 import type { Conversation, Message, ChatRequest, DialogueType } from '@/types'
+import { DialogueType as DT } from '@/types'
 
 export const useConversationStore = defineStore('conversation', () => {
   // State
@@ -122,15 +123,16 @@ export const useConversationStore = defineStore('conversation', () => {
       
       // Update conversation ID if this was the first message
       if (!currentConversation.value) {
-        currentConversation.value = {
+        const newConversation: Conversation = {
           id: response.conversation_id,
           user_id: 0,
           title: content.slice(0, 50),
-          dialogue_type: dialogueType || 'normal',
+          dialogue_type: dialogueType || DT.NORMAL,
           status: 'active',
           created_at: new Date().toISOString()
         }
-        conversations.value.unshift(currentConversation.value)
+        currentConversation.value = newConversation
+        conversations.value.unshift(newConversation)
       }
 
       // Replace temporary user message with actual one
